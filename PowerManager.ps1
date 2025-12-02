@@ -3,7 +3,6 @@
 # ========================================================================
 # Script todo-en-uno para gestionar opciones de energia en Windows
 # Ejecutar como Administrador
-# Autor: ImChxx-cpu
 # ========================================================================
 
 #Requires -RunAsAdministrator
@@ -26,162 +25,126 @@ $script:Categorias = @{
 }
 
 # ========================================================================
-# FUNCIONES PRINCIPALES
+# FUNCIONES AUXILIARES
 # ========================================================================
-
-function Test-AdminPrivileges {
-    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
-    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
 
 function Show-Header {
     Clear-Host
-    Write-Host ""
-    Write-Host "===========================================" -ForegroundColor Cyan
+    Write-Host "`n===========================================" -ForegroundColor Cyan
     Write-Host "  POWER SETTINGS MANAGER - Gestor Energia " -ForegroundColor Cyan
-    Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host ""
+    Write-Host "===========================================`n" -ForegroundColor Cyan
+}
+
+function Wait-KeyPress {
+    Write-Host "`nPresiona cualquier tecla para continuar..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
+
+function Get-Confirmation {
+    param([string]$Message)
+    $confirm = Read-Host $Message
+    return ($confirm -eq 'S' -or $confirm -eq 's')
+}
+
+# ========================================================================
+# FUNCIONES PRINCIPALES
+# ========================================================================
+
+function Set-PowerOptions {
+    param(
+        [string]$Path,
+        [int]$AttributeValue,
+        [string]$ActionText
+    )
+
+    Write-Host "`nProcesando..." -ForegroundColor Green
+
+    try {
+        $items = Get-ChildItem $Path -Recurse -ErrorAction Stop
+        $contador = 0
+
+        foreach ($item in $items) {
+            try {
+                $itemPath = $item.Name -replace 'HKEY_LOCAL_MACHINE','HKLM:'
+                Set-ItemProperty -Path $itemPath -Name 'Attributes' -Value $AttributeValue -Force -ErrorAction SilentlyContinue
+                $contador++
+            }
+            catch { }
+        }
+
+        Write-Host "`nCompletado: $contador opciones $ActionText" -ForegroundColor Green
+        Write-Host "Se recomienda reiniciar el sistema para aplicar los cambios" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "`nError: $($_.Exception.Message)" -ForegroundColor Red
+    }
 }
 
 function Unlock-AllOptions {
     Show-Header
     Write-Host "DESBLOQUEAR TODAS LAS OPCIONES" -ForegroundColor Yellow
-    Write-Host "===========================================" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Esta accion revelara TODAS las opciones de energia ocultas." -ForegroundColor White
-    Write-Host ""
+    Write-Host "===========================================`n" -ForegroundColor Yellow
+    Write-Host "Esta accion revelara TODAS las opciones de energia ocultas.`n" -ForegroundColor White
 
-    $confirm = Read-Host "Continuar? (S/N)"
-
-    if ($confirm -ne 'S' -and $confirm -ne 's') {
-        Write-Host ""
-        Write-Host "Operacion cancelada." -ForegroundColor Yellow
+    if (-not (Get-Confirmation "Continuar? (S/N)")) {
+        Write-Host "`nOperacion cancelada." -ForegroundColor Yellow
         Start-Sleep -Seconds 2
         return
     }
 
-    Write-Host ""
-    Write-Host "Procesando..." -ForegroundColor Green
-
-    try {
-        $PowerCfg = (Get-ChildItem $script:PowerSettingsPath -Recurse).Name
-        $contador = 0
-
-        foreach ($item in $PowerCfg) {
-            try {
-                Set-ItemProperty -Path $item.Replace('HKEY_LOCAL_MACHINE','HKLM:') -Name 'Attributes' -Value 2 -Force -ErrorAction SilentlyContinue
-                $contador++
-            }
-            catch {
-                # Silenciar errores individuales
-            }
-        }
-
-        Write-Host ""
-        Write-Host "Completado: $contador opciones desbloqueadas" -ForegroundColor Green
-        Write-Host "Se recomienda reiniciar el sistema para aplicar los cambios" -ForegroundColor Cyan
-    }
-    catch {
-        Write-Host ""
-        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    }
-
-    Write-Host ""
-    Write-Host "Presiona cualquier tecla para continuar..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    Set-PowerOptions -Path $script:PowerSettingsPath -AttributeValue 2 -ActionText "desbloqueadas"
+    Wait-KeyPress
 }
 
 function Reset-ToDefault {
     Show-Header
     Write-Host "RESTAURAR A DEFAULT" -ForegroundColor Yellow
-    Write-Host "===========================================" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "===========================================`n" -ForegroundColor Yellow
     Write-Host "Esta accion OCULTARA TODAS las opciones de energia." -ForegroundColor White
-    Write-Host "Las opciones volveran al estado predeterminado de Windows." -ForegroundColor White
-    Write-Host ""
+    Write-Host "Las opciones volveran al estado predeterminado de Windows.`n" -ForegroundColor White
 
-    $confirm = Read-Host "Continuar? (S/N)"
-
-    if ($confirm -ne 'S' -and $confirm -ne 's') {
-        Write-Host ""
-        Write-Host "Operacion cancelada." -ForegroundColor Yellow
+    if (-not (Get-Confirmation "Continuar? (S/N)")) {
+        Write-Host "`nOperacion cancelada." -ForegroundColor Yellow
         Start-Sleep -Seconds 2
         return
     }
 
-    Write-Host ""
-    Write-Host "Procesando..." -ForegroundColor Green
-
-    try {
-        $PowerCfg = (Get-ChildItem $script:PowerSettingsPath -Recurse).Name
-        $contador = 0
-
-        foreach ($item in $PowerCfg) {
-            try {
-                Set-ItemProperty -Path $item.Replace('HKEY_LOCAL_MACHINE','HKLM:') -Name 'Attributes' -Value 1 -Force -ErrorAction SilentlyContinue
-                $contador++
-            }
-            catch {
-                # Silenciar errores individuales
-            }
-        }
-
-        Write-Host ""
-        Write-Host "Completado: $contador opciones ocultadas" -ForegroundColor Green
-        Write-Host "Se recomienda reiniciar el sistema para aplicar los cambios" -ForegroundColor Cyan
-    }
-    catch {
-        Write-Host ""
-        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    }
-
-    Write-Host ""
-    Write-Host "Presiona cualquier tecla para continuar..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    Set-PowerOptions -Path $script:PowerSettingsPath -AttributeValue 1 -ActionText "ocultadas"
+    Wait-KeyPress
 }
 
 function Select-Categories {
     do {
         Show-Header
         Write-Host "SELECCIONAR CATEGORIAS" -ForegroundColor Yellow
-        Write-Host "===========================================" -ForegroundColor Yellow
-        Write-Host ""
-        Write-Host "Selecciona una categoria para modificar:" -ForegroundColor White
-        Write-Host ""
+        Write-Host "===========================================`n" -ForegroundColor Yellow
+        Write-Host "Selecciona una categoria para modificar:`n" -ForegroundColor White
 
+        $categoriasList = $script:Categorias.Keys | Sort-Object
         $i = 1
-        $categoriasList = @()
-        foreach ($cat in $script:Categorias.Keys) {
-            Write-Host "[$i] $cat" -ForegroundColor White
-            $categoriasList += $cat
+        foreach ($cat in $categoriasList) {
+            Write-Host "[$i] $cat" -ForegroundColor Cyan
             $i++
         }
 
-        Write-Host ""
-        Write-Host "[0] Volver al menu principal" -ForegroundColor Gray
-        Write-Host ""
+        Write-Host "`n[0] Volver al menu principal`n" -ForegroundColor Gray
 
         $seleccion = Read-Host "Categoria #"
 
-        if ($seleccion -eq "0") {
-            return
-        }
+        if ($seleccion -eq "0") { return }
 
-        if ($seleccion -match '^\d+$' -and [int]$seleccion -ge 1 -and [int]$seleccion -le $categoriasList.Count) {
-            $categoriaSeleccionada = $categoriasList[[int]$seleccion - 1]
+        $index = [int]$seleccion - 1
+        if ($seleccion -match '^\d+$' -and $index -ge 0 -and $index -lt $categoriasList.Count) {
+            $categoriaSeleccionada = $categoriasList[$index]
             $guid = $script:Categorias[$categoriaSeleccionada]
 
             Show-Header
             Write-Host "CATEGORIA: $categoriaSeleccionada" -ForegroundColor Yellow
-            Write-Host "===========================================" -ForegroundColor Yellow
-            Write-Host ""
-            Write-Host "Que hacer con esta categoria?" -ForegroundColor White
-            Write-Host ""
+            Write-Host "===========================================`n" -ForegroundColor Yellow
+            Write-Host "Que hacer con esta categoria?`n" -ForegroundColor White
             Write-Host "[1] MOSTRAR opciones (desbloquear)" -ForegroundColor Green
             Write-Host "[2] OCULTAR opciones (bloquear)" -ForegroundColor Red
-            Write-Host "[0] Cancelar" -ForegroundColor Gray
-            Write-Host ""
+            Write-Host "[0] Cancelar`n" -ForegroundColor Gray
 
             $accion = Read-Host "Accion"
 
@@ -189,90 +152,39 @@ function Select-Categories {
                 $attributeValue = if ($accion -eq "1") { 2 } else { 1 }
                 $accionTexto = if ($accion -eq "1") { "MOSTRADAS" } else { "OCULTADAS" }
 
-                Write-Host ""
-                Write-Host "Procesando..." -ForegroundColor Cyan
-
-                try {
-                    $ruta = "$script:PowerSettingsPath\$guid"
-
-                    if (Test-Path $ruta) {
-                        $items = Get-ChildItem $ruta -Recurse
-                        $contador = 0
-
-                        foreach ($item in $items) {
-                            try {
-                                Set-ItemProperty -Path $item.PSPath -Name 'Attributes' -Value $attributeValue -Force -ErrorAction SilentlyContinue
-                                $contador++
-                            }
-                            catch {
-                                # Silenciar errores individuales
-                            }
-                        }
-
-                        Write-Host ""
-                        Write-Host "Completado: $contador opciones $accionTexto en '$categoriaSeleccionada'" -ForegroundColor Green
-                    }
-                    else {
-                        Write-Host ""
-                        Write-Host "Error: No se encontro la ruta de la categoria" -ForegroundColor Red
-                    }
+                $ruta = "$script:PowerSettingsPath\$guid"
+                if (Test-Path $ruta) {
+                    Set-PowerOptions -Path $ruta -AttributeValue $attributeValue -ActionText "$accionTexto en '$categoriaSeleccionada'"
+                } else {
+                    Write-Host "`nError: No se encontro la ruta de la categoria" -ForegroundColor Red
                 }
-                catch {
-                    Write-Host ""
-                    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-                }
-
-                Write-Host ""
-                Write-Host "Presiona cualquier tecla para continuar..." -ForegroundColor Gray
-                $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                Wait-KeyPress
             }
             elseif ($accion -ne "0") {
-                Write-Host ""
-                Write-Host "Opcion invalida." -ForegroundColor Red
+                Write-Host "`nOpcion invalida." -ForegroundColor Red
                 Start-Sleep -Seconds 1
             }
         }
         else {
-            Write-Host ""
-            Write-Host "Seleccion invalida." -ForegroundColor Red
+            Write-Host "`nSeleccion invalida." -ForegroundColor Red
             Start-Sleep -Seconds 1
         }
-
     } while ($true)
 }
 
 function Show-MainMenu {
     Show-Header
-
-    Write-Host "[1] Desbloquear TODAS las opciones" -ForegroundColor White
-    Write-Host "[2] Restaurar a DEFAULT (ocultar todo)" -ForegroundColor White
-    Write-Host "[3] Seleccionar categorias a mostrar/ocultar" -ForegroundColor White
-    Write-Host ""
-    Write-Host "[0] Salir" -ForegroundColor Gray
-    Write-Host ""
-
-    $opcion = Read-Host "Selecciona una opcion"
-    return $opcion
+    Write-Host "[1] Desbloquear TODAS las opciones" -ForegroundColor Green
+    Write-Host "[2] Restaurar a DEFAULT (ocultar todo)" -ForegroundColor Red
+    Write-Host "[3] Seleccionar categorias a mostrar/ocultar" -ForegroundColor Yellow
+    Write-Host "`n[0] Salir`n" -ForegroundColor Gray
+    return Read-Host "Selecciona una opcion"
 }
 
 # ========================================================================
 # MAIN LOOP
 # ========================================================================
 
-# Verificar privilegios de administrador
-if (-not (Test-AdminPrivileges)) {
-    Clear-Host
-    Write-Host ""
-    Write-Host "ERROR: Este script requiere privilegios de Administrador" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Por favor, ejecuta PowerShell como Administrador y vuelve a intentar." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Presiona cualquier tecla para salir..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    exit
-}
-
-# Loop principal del menu
 do {
     $opcion = Show-MainMenu
 
@@ -282,16 +194,13 @@ do {
         "3" { Select-Categories }
         "0" {
             Show-Header
-            Write-Host "Saliendo..." -ForegroundColor Cyan
-            Write-Host ""
+            Write-Host "Saliendo...`n" -ForegroundColor Cyan
             Start-Sleep -Seconds 1
             break
         }
         default {
-            Write-Host ""
-            Write-Host "Opcion invalida. Intenta de nuevo." -ForegroundColor Red
+            Write-Host "`nOpcion invalida. Intenta de nuevo." -ForegroundColor Red
             Start-Sleep -Seconds 1
         }
     }
-
 } while ($opcion -ne "0")
